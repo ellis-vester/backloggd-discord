@@ -102,6 +102,35 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 		user.GamesBackloggd = gamesBackloggd
 	})
 
+	doc.Find("div.col-cus-5").Each(func(i int, selection *goquery.Selection) {
+
+		var gameFav backloggd.UserFavGame
+
+		selection.Find("a.cover-link").Each(func(i int, selection *goquery.Selection) {
+			gameFavURL, exists := selection.Attr("href")
+			if !exists {
+				success = false
+				errorMessage = "error parsing UserFavGame URL"
+				return
+			}
+
+			gameFav.URL = gameFavURL
+		})
+
+		selection.Find("img.card-img").Each(func(i int, selection *goquery.Selection) {
+			gameFavName, exists := selection.Attr("alt")
+			if !exists {
+				success = false
+				errorMessage = "error parsing userFavGame Name"
+				return
+			}
+
+			gameFav.Name = gameFavName
+		})
+
+		user.GamesFav = append(user.GamesFav, gameFav)
+	})
+
 	if !success {
 		return user, errors.New(errorMessage)
 	}
