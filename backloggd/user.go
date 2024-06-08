@@ -8,10 +8,17 @@ type User struct {
 	GamesPlayedThisYear int
 	GamesBackloggd      int
 	GamesFav            []UserFavGame
+
+	ReviewStats UserReviewStats
 }
 
 type UserFavGame struct {
-	Name string
-	URL  string
+	Name     string
+	URL      string
 	ImageURL string
+}
+
+type UserReviewStats struct {
+	ReviewCount int
+	FavCount    int
 }

@@ -108,7 +108,14 @@ var commandHandlers = map[string]func(session *discordgo.Session, i *discordgo.I
 }
 
 func userCommand(userId string) (backloggd.User, error) {
+
+	// TODO: scrape both at same time with goroutines
 	html, err := scraper.ScrapeUserHtml("https://www.backloggd.com/u/" + userId)
+	if err != nil {
+		return backloggd.User{}, err
+	}
+
+	reviewHtml, err := scraper.ScrapeReviewHTML("https://www.backloggd.com/u/" + userId + "/reviews")
 	if err != nil {
 		return backloggd.User{}, err
 	}
@@ -117,6 +124,13 @@ func userCommand(userId string) (backloggd.User, error) {
 	if err != nil {
 		return backloggd.User{}, err
 	}
+
+	userReviews, err := scraper.ParseReviewHTML(reviewHtml)
+	if err != nil {
+		return backloggd.User{}, err
+	}
+
+	user.ReviewStats = userReviews
 
 	return user, nil
 }
@@ -134,7 +148,7 @@ func buildUserEmbed(user backloggd.User) *discordgo.MessageEmbed {
 	embed.Fields = []*discordgo.MessageEmbedField{
 		{
 			Name:   "Stats",
-			Value:  "🎮 " + strconv.Itoa(user.GamesPlayedTotal) + "  📆 " + strconv.Itoa(user.GamesPlayedThisYear) + "  📚 " + strconv.Itoa(user.GamesBackloggd),
+			Value:  "🎮 " + strconv.Itoa(user.GamesPlayedTotal) + "  📆 " + strconv.Itoa(user.GamesPlayedThisYear) + "  📚 " + strconv.Itoa(user.GamesBackloggd) + "  📝" + strconv.Itoa(user.ReviewStats.ReviewCount) + "  🩷 " + strconv.Itoa(user.ReviewStats.FavCount),
 			Inline: false,
 		},
 	}

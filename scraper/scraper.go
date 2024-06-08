@@ -28,6 +28,24 @@ func ScrapeUserHtml(url string) (string, error) {
 	return html, err
 }
 
+func ScrapeReviewHTML(url string) (string, error) {
+	collector := colly.NewCollector()
+
+	var err error
+	var html string
+
+	collector.OnHTML("body", func(e *colly.HTMLElement) {
+		html, err = e.DOM.Html()
+	})
+
+	err = collector.Visit(url)
+	if err != nil {
+		return html, err
+	}
+
+	return html, err
+}
+
 func ParseUserHtml(content string) (backloggd.User, error) {
 
 	var user backloggd.User
@@ -144,4 +162,32 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 	}
 
 	return user, nil
+}
+
+func ParseReviewHTML(content string) (backloggd.UserReviewStats, error) {
+	var userReviewStats backloggd.UserReviewStats
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
+	if err != nil {
+		return userReviewStats, errors.New("error creating UserReviewStats reader")
+	}
+
+	selection := doc.Find("h2.like-count-header").First()
+
+	firstSelection := selection.Find("span.text-white").First()
+	favCount, err := strconv.Atoi(strings.Trim(firstSelection.Text(), " "))
+	if err != nil {
+		return backloggd.UserReviewStats{}, err
+	}
+
+	lastSelection := selection.Find("span.text-white").Last()
+	reviewCount, err := strconv.Atoi(strings.Trim(lastSelection.Text(), " "))
+	if err != nil {
+		return backloggd.UserReviewStats{}, errors.New("error parsing UserReviewStats ReviewCount from HTML")
+	}
+
+	return backloggd.UserReviewStats{
+		ReviewCount: reviewCount,
+		FavCount:    favCount,
+	}, nil
 }
