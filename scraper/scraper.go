@@ -34,7 +34,7 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
-		return user, errors.New("Error creating User reader")
+		return user, errors.New("error creating User reader")
 	}
 
 	success := true
@@ -53,7 +53,7 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 	})
 
 	// Parse bio
-	// TODO: sample more bios to parse out links and other types of text, format as markdown
+	// TODO: sample more bios to parse out links and other types of text
 	doc.Find("span#bio-body").Each(func(i int, selection *goquery.Selection) {
 		bio := selection.Text()
 		if bio == "" {
@@ -125,7 +125,15 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 				return
 			}
 
+			gameFavImg, exists := selection.Attr("src")
+			if !exists {
+				success = false
+				errorMessage = "error parsing userFavGame ImageUrl"
+				return
+			}
+
 			gameFav.Name = gameFavName
+			gameFav.ImageURL = gameFavImg
 		})
 
 		user.GamesFav = append(user.GamesFav, gameFav)

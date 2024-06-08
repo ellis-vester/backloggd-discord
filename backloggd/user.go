@@ -13,4 +13,5 @@ type User struct {
 type UserFavGame struct {
 	Name string
 	URL  string
+	ImageURL string
 }

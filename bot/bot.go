@@ -127,9 +127,9 @@ func buildUserEmbed(user backloggd.User) *discordgo.MessageEmbed {
 
 	embed.URL = "https://www.backloggd.com/u/" + user.Name
 	embed.Title = user.Name
-	embed.Description = formatBio(user.Bio[0:300])
+	embed.Description = formatBio(user.Bio)
 	embed.Thumbnail = &discordgo.MessageEmbedThumbnail{
-		URL: "https://images.igdb.com/igdb/image/upload/t_cover_big/fhbeilnghyhhmjqhinqa.jpg",
+		URL: user.GamesFav[0].ImageURL,
 	}
 	embed.Fields = []*discordgo.MessageEmbedField{
 		{
@@ -159,12 +159,13 @@ func buildUserEmbed(user backloggd.User) *discordgo.MessageEmbed {
 func formatBio(bio string) string {
 	for i, v := range bio {
 		if v == '\n' && i != 0 {
-			return bio[0:i-1] + "..."
+			return bio[0:i]
 		}
 	}
 
 	if len(bio) > 300 {
 		return bio[0:300] + "..."
 	}
+
 	return bio
 }
