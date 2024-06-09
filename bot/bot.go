@@ -8,6 +8,8 @@ import (
 	"github.com/ellis-vester/backloggd-discord/backloggd"
 	"github.com/ellis-vester/backloggd-discord/config"
 	"github.com/ellis-vester/backloggd-discord/scraper"
+
+	"github.com/ellis-vester/backloggd-discord/types"
 )
 
 type Bot struct {
@@ -109,30 +111,71 @@ var commandHandlers = map[string]func(session *discordgo.Session, i *discordgo.I
 
 func userCommand(userId string) (backloggd.User, error) {
 
-	// TODO: scrape both at same time with goroutines
-	html, err := scraper.ScrapeUserHtml("https://www.backloggd.com/u/" + userId)
-	if err != nil {
-		return backloggd.User{}, err
+	userChannel := make(chan types.Result[backloggd.User])
+	go func() {
+		userHTML, err := scraper.ScrapeUserHtml("https://www.backloggd.com/u/" + userId)
+		if err != nil {
+			userChannel <- types.Result[backloggd.User]{
+				Data: backloggd.User{},
+				Err:  err,
+			}
+			return
+		}
+
+		user, err := scraper.ParseUserHtml(userHTML)
+		if err != nil {
+			userChannel <- types.Result[backloggd.User]{
+				Data: backloggd.User{},
+				Err:  err,
+			}
+			return
+		}
+
+		userChannel <- types.Result[backloggd.User]{
+			Data: user,
+			Err:  nil,
+		}
+	}()
+
+	reviewChannel := make(chan types.Result[backloggd.UserReviewStats])
+	go func() {
+		reviewHtml, err := scraper.ScrapeReviewHTML("https://www.backloggd.com/u/" + userId + "/reviews")
+		if err != nil {
+			reviewChannel <- types.Result[backloggd.UserReviewStats]{
+				Data: backloggd.UserReviewStats{},
+				Err:  err,
+			}
+			return
+		}
+
+		userReviews, err := scraper.ParseReviewHTML(reviewHtml)
+		if err != nil {
+			reviewChannel <- types.Result[backloggd.UserReviewStats]{
+				Data: backloggd.UserReviewStats{},
+				Err:  err,
+			}
+			return
+		}
+
+		reviewChannel <- types.Result[backloggd.UserReviewStats]{
+			Data: userReviews,
+			Err:  nil,
+		}
+	}()
+
+	userResult := <-userChannel
+	if userResult.Err != nil {
+		return backloggd.User{}, userResult.Err
 	}
 
-	reviewHtml, err := scraper.ScrapeReviewHTML("https://www.backloggd.com/u/" + userId + "/reviews")
-	if err != nil {
-		return backloggd.User{}, err
+	reviewResult := <-reviewChannel
+	if reviewResult.Err != nil {
+		return backloggd.User{}, reviewResult.Err
 	}
 
-	user, err := scraper.ParseUserHtml(html)
-	if err != nil {
-		return backloggd.User{}, err
-	}
+	userResult.Data.ReviewStats = reviewResult.Data
 
-	userReviews, err := scraper.ParseReviewHTML(reviewHtml)
-	if err != nil {
-		return backloggd.User{}, err
-	}
-
-	user.ReviewStats = userReviews
-
-	return user, nil
+	return userResult.Data, nil
 }
 
 func buildUserEmbed(user backloggd.User) *discordgo.MessageEmbed {
