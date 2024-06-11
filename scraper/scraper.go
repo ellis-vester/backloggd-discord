@@ -28,6 +28,24 @@ func ScrapeUserHtml(url string) (string, error) {
 	return html, err
 }
 
+func ScrapeUserReviewsHTML(url string) (string, error) {
+	collector := colly.NewCollector()
+
+	var err error
+	var html string
+
+	collector.OnHTML("body", func(e *colly.HTMLElement) {
+		html, err = e.DOM.Html()
+	})
+
+	err = collector.Visit(url)
+	if err != nil {
+		return html, err
+	}
+
+	return html, err
+}
+
 func ScrapeReviewHTML(url string) (string, error) {
 	collector := colly.NewCollector()
 
@@ -164,7 +182,7 @@ func ParseUserHtml(content string) (backloggd.User, error) {
 	return user, nil
 }
 
-func ParseReviewHTML(content string) (backloggd.UserReviewStats, error) {
+func ParseUserReviewsHTML(content string) (backloggd.UserReviewStats, error) {
 	var userReviewStats backloggd.UserReviewStats
 
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
@@ -189,5 +207,93 @@ func ParseReviewHTML(content string) (backloggd.UserReviewStats, error) {
 	return backloggd.UserReviewStats{
 		ReviewCount: reviewCount,
 		FavCount:    favCount,
+	}, nil
+}
+
+func ParseReviewHTML(content string) (backloggd.Review, error) {
+	var review backloggd.Review
+
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
+	if err != nil {
+		return review, errors.New("error creating Review reader")
+	}
+
+	selection := doc.Find("div#review-sidebar").First()
+
+	imageSelection := selection.Find("img.card-img").First()
+	imageURL, exists := imageSelection.Attr("src")
+	if !exists {
+		return review, errors.New("error getting image URL")
+	}
+
+	gameTitle, exists := imageSelection.Attr("alt")
+	if !exists {
+		return review, errors.New("error getting GameTitle")
+
+	}
+
+	gameURLSelection := selection.Find("div.col-md-12").First()
+	gameURL, exists := gameURLSelection.ChildrenFiltered("a").First().Attr("href")
+	if !exists {
+		return review, errors.New("error getting GameURL")
+	}
+
+	topBarSelection := selection.Find("div.top-bar").First()
+	username := topBarSelection.ChildrenFiltered("p.mb-0").First().Text()
+	ratingStyle, exists := topBarSelection.Find("div.stars-top").First().Attr("style")
+	if !exists {
+		return review, errors.New("error getting ratingStyle")
+	}
+
+	ratingStyle = strings.Replace(ratingStyle, "width:", "", 1)
+
+	ratingStyle = strings.Replace(ratingStyle, "%", "", 1)
+	rating, err := strconv.Atoi(ratingStyle)
+
+	if err != nil {
+		return review, err
+	}
+
+	playType := topBarSelection.Find("p.play-type").First().Text()
+
+	reviewPlatformSelection := topBarSelection.Find("a.review-platform").First()
+	reviewPlatform := reviewPlatformSelection.ChildrenFiltered("p").First().Text()
+
+	reviewText := doc.Find("div.card-text").First().Text()
+
+	likesText := doc.Find("p.like-counter").Children().First().Text()
+	likes, err := strconv.Atoi(strings.Replace(likesText, " Likes", "", 1))
+	if err != nil {
+		return review, err
+	}
+
+	commentsText := doc.Find("h2#comments-header").First().Text()
+	commentsText = strings.Replace(commentsText, " ", "", 1)
+	commentsText = strings.Replace(commentsText, " Comments", "", 1)
+
+	if commentsText == "" {
+		commentsText = "0"
+	}
+
+	comments, err := strconv.Atoi(commentsText)
+	if err != nil {
+		return review, err
+	}
+
+	date := doc.Find("div.review-bottom-bar").ChildrenFiltered("p").Last().Text()
+	date = strings.Replace(date, "Reviewed on ", "", 1)
+
+	return backloggd.Review{
+		Title:        gameTitle,
+		Username:     username,
+		GameURL:      gameURL,
+		GameImageURL: imageURL,
+		PlayType:     playType,
+		Platform:     reviewPlatform,
+		Rating:       rating,
+		Text:         reviewText,
+		Likes:        likes,
+		Comments:     comments,
+		Date:         date,
 	}, nil
 }

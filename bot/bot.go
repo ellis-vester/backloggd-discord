@@ -72,6 +72,19 @@ var commands = []*discordgo.ApplicationCommand{
 					},
 				},
 			},
+			{
+				Name:         "review",
+				Description:  "Link to a Backloggd review.",
+				Type:         discordgo.ApplicationCommandOptionSubCommand,
+				Autocomplete: true,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Name:        "url",
+						Description: "Full URL to the game review",
+						Type:        discordgo.ApplicationCommandOptionString,
+					},
+				},
+			},
 		},
 	},
 }
@@ -86,25 +99,47 @@ var commandHandlers = map[string]func(session *discordgo.Session, i *discordgo.I
 		case "user":
 			userId := options[0].Options[0].StringValue()
 
+			// TODO: sanitize the userid input
 			user, err = userCommand(userId)
 			if err != nil {
 				panic(err)
 			}
 
-			// TODO: sanitize the userid input
-		}
-
-		err = session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{
-					buildUserEmbed(user),
+			err = session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: []*discordgo.MessageEmbed{
+						buildUserEmbed(user),
+					},
 				},
-			},
-		})
+			})
 
-		if err != nil {
-			fmt.Printf("Error sending message: %v", err)
+			if err != nil {
+				fmt.Printf("Error sending message: %v", err)
+			}
+		case "review":
+			reviewUrl := options[0].Options[0].StringValue()
+
+			fmt.Println(reviewUrl)
+
+			review, err := reviewCommand(reviewUrl)
+			if err != nil {
+				panic(err)
+			}
+
+			err = session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: []*discordgo.MessageEmbed{
+						buildReviewEmbed(review),
+					},
+				},
+			})
+			if err != nil {
+				panic(err)
+			}
+			// TODO sanitize review input url
+
 		}
 	},
 }
@@ -139,7 +174,7 @@ func userCommand(userId string) (backloggd.User, error) {
 
 	reviewChannel := make(chan types.Result[backloggd.UserReviewStats])
 	go func() {
-		reviewHtml, err := scraper.ScrapeReviewHTML("https://www.backloggd.com/u/" + userId + "/reviews")
+		reviewHtml, err := scraper.ScrapeUserReviewsHTML("https://www.backloggd.com/u/" + userId + "/reviews")
 		if err != nil {
 			reviewChannel <- types.Result[backloggd.UserReviewStats]{
 				Data: backloggd.UserReviewStats{},
@@ -148,7 +183,7 @@ func userCommand(userId string) (backloggd.User, error) {
 			return
 		}
 
-		userReviews, err := scraper.ParseReviewHTML(reviewHtml)
+		userReviews, err := scraper.ParseUserReviewsHTML(reviewHtml)
 		if err != nil {
 			reviewChannel <- types.Result[backloggd.UserReviewStats]{
 				Data: backloggd.UserReviewStats{},
@@ -225,4 +260,61 @@ func formatBio(bio string) string {
 	}
 
 	return bio
+}
+
+func reviewCommand(url string) (backloggd.Review, error) {
+
+	reviewHTML, err := scraper.ScrapeReviewHTML(url)
+	if err != nil {
+		return backloggd.Review{}, err
+	}
+
+	review, err := scraper.ParseReviewHTML(reviewHTML)
+	if err != nil {
+		return backloggd.Review{}, err
+	}
+
+	review.URL = url
+
+	return review, nil
+}
+
+func buildReviewEmbed(review backloggd.Review) *discordgo.MessageEmbed {
+	embed := discordgo.MessageEmbed{}
+
+	embed.URL = review.URL
+	embed.Description = review.Text[0:300]
+	embed.Thumbnail = &discordgo.MessageEmbedThumbnail{
+		URL: review.GameImageURL,
+	}
+	embed.Author = &discordgo.MessageEmbedAuthor{
+		Name: review.Username,
+		URL:  review.URL,
+	}
+
+	starRating := float64(float64(review.Rating) / 20.0)
+
+	embed.Title = strconv.FormatFloat(starRating, 'f', 1, 32) + "⭐ review of " + review.Title
+	embed.Fields = []*discordgo.MessageEmbedField{
+		{
+			Name:   "Stats",
+			Value:  " 🩷 " + strconv.Itoa(review.Likes) + "  💬 " + strconv.Itoa(review.Comments),
+			Inline: false,
+		},
+		{
+			Name:   "Status",
+			Value:  review.PlayType,
+			Inline: true,
+		},
+	}
+
+	if review.Platform != "" {
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   "Platform",
+			Value:  review.Platform,
+			Inline: true,
+		})
+	}
+
+	return &embed
 }
