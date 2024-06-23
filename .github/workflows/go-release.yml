@@ -1,0 +1,24 @@
+on:
+  release:
+    types: [created]
+
+jobs:
+  releases-matrix:
+    name: Release Go Binary
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # build and publish in parallel: linux/amd64, windows/amd64
+        goos: [linux]
+        goarch: [amd64]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: wangyoucao577/go-release-action@v1.33
+      with:
+        github_token: ${{ secrets.GH_ACTIONS_TOKEN }}
+        goos: ${{ matrix.goos }}
+        goarch: ${{ matrix.goarch }}
+        extra_files: LICENSE README.md
+        goversion: 'https://go.dev/dl/go1.22.3.linux-amd64.tar.gz'
+        binary_name: 'backloggd-discord'
+        release_name: '${{ github.event.release.name }}'
