@@ -292,9 +292,13 @@ func buildReviewEmbed(review backloggd.Review) *discordgo.MessageEmbed {
 		URL:  review.URL,
 	}
 
-	starRating := float64(float64(review.Rating) / 20.0)
+	if review.Rating != -1 {
+		starRating := float64(float64(review.Rating) / 20.0)
+		embed.Title = strconv.FormatFloat(starRating, 'f', 1, 32) + "⭐ review of " + review.Title
+	}else{
+		embed.Title = "Review of " + review.Title
+	}
 
-	embed.Title = strconv.FormatFloat(starRating, 'f', 1, 32) + "⭐ review of " + review.Title
 	embed.Fields = []*discordgo.MessageEmbedField{
 		{
 			Name:   "Stats",

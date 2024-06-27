@@ -241,17 +241,17 @@ func ParseReviewHTML(content string) (backloggd.Review, error) {
 	topBarSelection := selection.Find("div.top-bar").First()
 	username := topBarSelection.ChildrenFiltered("p.mb-0").First().Text()
 	ratingStyle, exists := topBarSelection.Find("div.stars-top").First().Attr("style")
-	if !exists {
-		return review, errors.New("error getting ratingStyle")
-	}
 
-	ratingStyle = strings.Replace(ratingStyle, "width:", "", 1)
+	rating := -1
+	if exists {
+		ratingStyle = strings.Replace(ratingStyle, "width:", "", 1)
 
-	ratingStyle = strings.Replace(ratingStyle, "%", "", 1)
-	rating, err := strconv.Atoi(ratingStyle)
+		ratingStyle = strings.Replace(ratingStyle, "%", "", 1)
+		rating, err = strconv.Atoi(ratingStyle)
 
-	if err != nil {
-		return review, err
+		if err != nil {
+			return review, err
+		}
 	}
 
 	playType := topBarSelection.Find("p.play-type").First().Text()
