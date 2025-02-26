@@ -1,14 +1,54 @@
 package scraper
 
 import (
+	"encoding/xml"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/ellis-vester/backloggd-discord/backloggd"
+	"github.com/ellis-vester/backloggd-discord/types"
 	"github.com/gocolly/colly"
 )
+
+func ScrapeRssUrl(url string) ([]byte, error) {
+	var err error
+	var rss []byte
+
+	resp, err := http.Get(url)
+
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	defer resp.Body.Close()
+	rss, err = io.ReadAll(resp.Body)
+
+	if err != nil {
+		return make([]byte, 0), err
+	}
+
+	return rss, err
+}
+
+func ParseRssUrl(rssBytes []byte) (types.Rss, error) {
+	var document types.Rss
+
+	err := xml.Unmarshal(rssBytes, &document)
+
+	if err != nil {
+		fmt.Print(err)
+		return types.Rss{}, err
+	}
+
+	fmt.Printf("%+v\n", document)
+
+	return document, err
+}
 
 func ScrapeUserHtml(url string) (string, error) {
 	collector := colly.NewCollector()
