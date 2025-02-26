@@ -3,7 +3,6 @@ package scraper
 import (
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -41,11 +40,8 @@ func ParseRssUrl(rssBytes []byte) (types.Rss, error) {
 	err := xml.Unmarshal(rssBytes, &document)
 
 	if err != nil {
-		fmt.Print(err)
 		return types.Rss{}, err
 	}
-
-	fmt.Printf("%+v\n", document)
 
 	return document, err
 }
