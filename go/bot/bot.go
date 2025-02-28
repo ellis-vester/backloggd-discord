@@ -80,7 +80,20 @@ var commands = []*discordgo.ApplicationCommand{
 				Options: []*discordgo.ApplicationCommandOption{
 					{
 						Name:        "url",
-						Description: "Full URL to the game review",
+						Description: "Full URL to the game review.",
+						Type:        discordgo.ApplicationCommandOptionString,
+					},
+				},
+			},
+			{
+				Name:         "subscribe",
+				Description:  "Subscribe to a user's review RSS feed in this channel.",
+				Type:         discordgo.ApplicationCommandOptionSubCommand,
+				Autocomplete: true,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Name:        "url",
+						Description: "Full URL to the review RSS feed.",
 						Type:        discordgo.ApplicationCommandOptionString,
 					},
 				},
@@ -139,7 +152,26 @@ var commandHandlers = map[string]func(session *discordgo.Session, i *discordgo.I
 				panic(err)
 			}
 			// TODO sanitize review input url
+		case "subscribe":
+			rssUrl := options[0].Options[0].StringValue()
 
+			fmt.Println(rssUrl)
+			review, err := subscribeCommand(rssUrl)
+			if err != nil {
+				panic(err)
+			}
+
+			err = session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: []*discordgo.MessageEmbed{
+						buildReviewEmbed(review),
+					},
+				},
+			})
+			if err != nil {
+				panic(err)
+			}
 		}
 	},
 }
@@ -295,7 +327,7 @@ func buildReviewEmbed(review backloggd.Review) *discordgo.MessageEmbed {
 	if review.Rating != -1 {
 		starRating := float64(float64(review.Rating) / 20.0)
 		embed.Title = strconv.FormatFloat(starRating, 'f', 1, 32) + "⭐ review of " + review.Title
-	}else{
+	} else {
 		embed.Title = "Review of " + review.Title
 	}
 
@@ -321,4 +353,35 @@ func buildReviewEmbed(review backloggd.Review) *discordgo.MessageEmbed {
 	}
 
 	return &embed
+}
+
+func subscribeCommand(url string) (backloggd.Review, error) {
+
+	rssBytes, err := scraper.ScrapeRssUrl(url)
+	if err != nil {
+		return backloggd.Review{}, err
+	}
+
+	rss, err := scraper.ParseRssUrl(rssBytes)
+	if err != nil {
+		fmt.Print(err)
+		return backloggd.Review{}, err
+	}
+
+	review := backloggd.Review{
+		URL:          rss.Channel.Items[0].Link,
+		Title:        rss.Channel.Items[0].Title,
+		Username:     rss.Channel.Items[0].Reviewer,
+		GameURL:      url,
+		GameImageURL: rss.Channel.Items[0].Image.Url,
+		PlayType:     "",
+		Platform:     "",
+		Rating:       rss.Channel.Items[0].UserRating,
+		Text:         rss.Channel.Items[0].Description,
+		Likes:        0,
+		Comments:     0,
+		Date:         rss.Channel.Items[0].PubDate,
+	}
+
+	return review, nil
 }
