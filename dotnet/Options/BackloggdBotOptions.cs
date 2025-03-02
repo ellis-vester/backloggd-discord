@@ -8,4 +8,5 @@ public sealed class Settings
 public sealed class BotConfig
 {
     public required string Token { get; set; }
+    public required bool AddCommands { get; set; }
 }
