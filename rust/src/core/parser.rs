@@ -25,7 +25,7 @@ pub struct RssItem {
     pub guid: String,
     pub user_rating: i8,
     pub reviewer: String,
-    pub image: RssImage
+    pub image: RssImage,
 }
 
 #[derive(Serialize, Deserialize)]
