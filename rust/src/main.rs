@@ -26,5 +26,7 @@ async fn main() {
         .framework(framework)
         .await;
 
+    // TODO: Add background process to publish review subscriptions.
+
     client.unwrap().start().await.unwrap();
 }
