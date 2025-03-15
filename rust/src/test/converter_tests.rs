@@ -1,4 +1,4 @@
-use chrono::{NaiveDateTime, NaiveTime, NaiveDate};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 
 #[test]
 fn parse_backloggd_date_returns_valid_datetime() {
@@ -6,14 +6,15 @@ fn parse_backloggd_date_returns_valid_datetime() {
     let time = NaiveTime::from_hms_opt(01, 05, 21).unwrap();
 
     let expected = NaiveDateTime::new(date, time);
-    let actual = crate::core::converter::parse_backloggd_rss_date("Sat, 04 May 2024 01:05:21 +0000");
+    let actual =
+        crate::core::converter::parse_backloggd_rss_date("Sat, 04 May 2024 01:05:21 +0000");
 
     match actual {
         Ok(value) => {
             // Assert
             assert_eq!(value.date(), expected.date());
             assert_eq!(value.time(), expected.time());
-        },
+        }
         Err(err) => {
             panic!("{}", err);
         }
@@ -33,7 +34,7 @@ fn parse_sqlite_date_returns_valid_datetime() {
             // Assert
             assert_eq!(value.date(), expected.date());
             assert_eq!(value.time(), expected.time());
-        },
+        }
         Err(err) => {
             panic!("{}", err);
         }
