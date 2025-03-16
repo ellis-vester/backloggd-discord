@@ -11,7 +11,10 @@ pub async fn save_feed(feed_url: &str) -> Result<i64, Error> {
     let connection = database.connect()?;
 
     connection
-        .execute("INSERT OR IGNORE INTO RssFeeds (Url) values (?1)", params!(feed_url))
+        .execute(
+            "INSERT OR IGNORE INTO RssFeeds (Url) values (?1)",
+            params!(feed_url),
+        )
         .await?;
 
     // Get the identifier of the just inserted URL
