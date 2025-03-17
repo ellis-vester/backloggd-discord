@@ -8,6 +8,9 @@ anyhow = "1.0.97"
 base64 = "0.22.1"
 chrono = "0.4.40"
 libsql = "0.6.0"
+opentelemetry = "0.28.0"
+opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic", "reqwest-rustls"] }
+opentelemetry_sdk = "0.28.0"
 poise = "0.6.1"
 regex = "1.11.1"
 serde = "1.0.219"
@@ -16,5 +19,6 @@ thiserror = "2.0.12"
 tokio = { version = "1.44.0", features = ["full", "tracing"] }
 tracing = "0.1.41"
 tracing-loki = "=0.2.4"
+tracing-opentelemetry = "0.29.0"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 

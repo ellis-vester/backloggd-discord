@@ -2,11 +2,18 @@ pub mod commands;
 pub mod core;
 pub mod test;
 
+use opentelemetry::global;
+use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
 use tracing_subscriber::filter::LevelFilter;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use poise::serenity_prelude as serenity;
 use tracing_loki::url::Url;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, FmtSubscriber};
+
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use opentelemetry::trace::{Tracer, TracerProvider as _};
+use tracing::{error, span};
+use tracing_subscriber::Registry;
 
 #[tokio::main]
 async fn main() {
@@ -41,7 +48,7 @@ async fn main() {
     let basic_auth = format!("{grafana_user}:{grafana_password}");
     let encoded_basic_auth = BASE64_STANDARD.encode(basic_auth.as_bytes());
 
-    let (layer, task) = tracing_loki::builder()
+    let (log_layer, task) = tracing_loki::builder()
         .label("app", "backloggd-discord")
         .unwrap()
         .http_header("Authorization", format!("Basic {encoded_basic_auth}"))
@@ -53,11 +60,25 @@ async fn main() {
     .with_default_directive(LevelFilter::INFO.into())
     .parse("").unwrap();
 
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .build().unwrap();
+
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
+        .build();
+
+    let tracer = provider.tracer("backloggd-discord");
+    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
     tracing_subscriber::registry()
         .with(filter)
         .with(tracing_subscriber::fmt::Layer::new())
-        .with(layer)
+        .with(log_layer)
+        .with(telemetry)
         .init();
+
+    global::set_tracer_provider(provider.clone());
 
     tokio::spawn(task);
 
