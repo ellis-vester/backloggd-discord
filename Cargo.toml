@@ -9,6 +9,7 @@ base64 = "0.22.1"
 chrono = "0.4.40"
 libsql = "0.6.0"
 opentelemetry = "0.28.0"
+opentelemetry-appender-tracing = "0.28.1"
 opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic", "reqwest-rustls"] }
 opentelemetry_sdk = "0.28.0"
 poise = "0.6.1"

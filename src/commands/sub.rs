@@ -34,7 +34,6 @@ pub async fn sub(
     ctx: Context<'_>,
     #[description = "RSS feed URL to subscribe channel to"] feed_url: Option<String>,
 ) -> Result<(), Error> {
-
     match feed_url {
         None => {
             let _future = ctx.reply("You must provide a value for feed_url").await?;

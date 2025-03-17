@@ -3,17 +3,14 @@ pub mod core;
 pub mod test;
 
 use opentelemetry::global;
-use opentelemetry_otlp::{WithExportConfig, WithTonicConfig};
-use tracing_subscriber::filter::LevelFilter;
-use base64::{prelude::BASE64_STANDARD, Engine};
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use poise::serenity_prelude as serenity;
-use tracing_loki::url::Url;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, FmtSubscriber};
+use tracing_subscriber::{filter::LevelFilter, EnvFilter};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use opentelemetry_sdk::trace::SdkTracerProvider;
-use opentelemetry::trace::{Tracer, TracerProvider as _};
-use tracing::{error, span};
-use tracing_subscriber::Registry;
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_sdk::logs::SdkLoggerProvider;
+use tracing_subscriber::layer::Layer;
 
 #[tokio::main]
 async fn main() {
@@ -37,53 +34,53 @@ async fn main() {
         .framework(framework)
         .await;
 
-    let grafana_user = std::env::var("GRAFANA_USER").expect("Failed to read GRAFANA_USER from environment variable");
-    let grafana_password = std::env::var("GRAFANA_PASSWORD").expect("Failed to read GRAFANA_PASSWORD from environment variable");
-    let grafana_url = std::env::var("GRAFANA_URL").expect("Failed to read GRAFANA_URL from environment variable");
-
-    let url = Url::parse(&grafana_url).expect("Failed to parse Grafana URL");
-
-    print!("password: {}", grafana_password);
-
-    let basic_auth = format!("{grafana_user}:{grafana_password}");
-    let encoded_basic_auth = BASE64_STANDARD.encode(basic_auth.as_bytes());
-
-    let (log_layer, task) = tracing_loki::builder()
-        .label("app", "backloggd-discord")
-        .unwrap()
-        .http_header("Authorization", format!("Basic {encoded_basic_auth}"))
-        .unwrap()
-        .build_url(url)
-        .unwrap();
-
     let filter = tracing_subscriber::filter::EnvFilter::builder()
-    .with_default_directive(LevelFilter::INFO.into())
-    .parse("").unwrap();
+        .with_default_directive(LevelFilter::INFO.into())
+        .parse("")
+        .unwrap();
 
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
         .with_batch_exporter(exporter)
         .build();
 
+    let log_exporter = opentelemetry_otlp::LogExporter::builder()
+        .with_http()
+        .build()
+        .unwrap();
+
+    let logger_provider = SdkLoggerProvider::builder()
+        .with_batch_exporter(log_exporter)
+        .build();
+
     let tracer = provider.tracer("backloggd-discord");
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+
+    let otel_layer = OpenTelemetryTracingBridge::new(&logger_provider);
+
+    let filter_otel = EnvFilter::new("info")
+        .add_directive("hyper=off".parse().unwrap())
+        .add_directive("opentelemetry=off".parse().unwrap())
+        .add_directive("tonic=off".parse().unwrap())
+        .add_directive("h2=off".parse().unwrap())
+        .add_directive("reqwest=off".parse().unwrap());
+
+    let otel_layer = otel_layer.with_filter(filter_otel);
 
     tracing_subscriber::registry()
         .with(filter)
         .with(tracing_subscriber::fmt::Layer::new())
-        .with(log_layer)
+        .with(otel_layer)
         .with(telemetry)
         .init();
 
     global::set_tracer_provider(provider.clone());
 
-    tokio::spawn(task);
-
     // TODO: Add background process to publish review subscriptions.
 
     client.unwrap().start().await.unwrap();
 }
-
