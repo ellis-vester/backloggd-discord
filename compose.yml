@@ -1,0 +1,7 @@
+name: backloggd-discord
+
+services:
+  bot:
+    image: backloggd-discord:latest
+  database:
+    
