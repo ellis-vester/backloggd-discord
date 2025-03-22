@@ -1,7 +1,21 @@
+version: "3.7"
 name: backloggd-discord
 
 services:
   bot:
     image: backloggd-discord:latest
-  database:
-    
+    env_file: ".bot.env"
+    restart: always
+    volumes:
+    - db:/var/lib/backloggd-discord
+    secrets:
+    - discord_token
+    - otlp_token
+
+volumes:
+  db:
+secrets:
+  discord_token:
+    external: true
+  otlp_token:
+    external: true
