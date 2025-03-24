@@ -2,6 +2,10 @@ pub mod commands;
 pub mod core;
 pub mod test;
 
+use core::repository::Repository;
+
+use crate::core::config;
+
 use opentelemetry::global;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use poise::serenity_prelude as serenity;
@@ -12,25 +16,39 @@ use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
 use tracing_subscriber::layer::Layer;
 
+use base64::prelude::*;
+
 #[tokio::main]
 async fn main() {
-    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let intents = serenity::GatewayIntents::non_privileged();
+    // TODO: move configuration into config-rs
+    let otlp_token = config::get_docker_file_secret("/run/secrets/otlp_token")
+        .expect("Error reading otel_token from podman secret.");
+    let discord_token = config::get_docker_file_secret("/run/secrets/discord_token")
+        .expect("Error reading discord_token from podman secret.");
+    let otlp_username = std::env::var("OTLP_USERNAME")
+        .expect("Error while reading OTLP_USERNAME environment variable.");
+    let otlp_auth_header = BASE64_STANDARD.encode(format!("{}:{}", otlp_username, otlp_token));
 
+    std::env::set_var(
+        "OTEL_EXPORTER_OTLP_HEADERS",
+        format!("Authorization=Basic {}", otlp_auth_header),
+    );
+
+    let intents = serenity::GatewayIntents::non_privileged();
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![commands::sub::sub()],
+            commands: vec![commands::sub::sub(), commands::list::list()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(commands::sub::Data {})
+                Ok(commands::Data {})
             })
         })
         .build();
 
-    let client = serenity::ClientBuilder::new(token, intents)
+    let serenity_client = serenity::ClientBuilder::new(&discord_token, intents)
         .framework(framework)
         .await;
 
@@ -82,5 +100,9 @@ async fn main() {
 
     // TODO: Add background process to publish review subscriptions.
 
-    client.unwrap().start().await.unwrap();
+    // Init database
+    let repo = crate::core::repository::SqliteRepository {};
+    repo.init_database().await.unwrap();
+
+    serenity_client.unwrap().start().await.unwrap();
 }

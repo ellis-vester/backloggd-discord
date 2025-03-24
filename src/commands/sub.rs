@@ -1,24 +1,13 @@
-use crate::core::repository;
+use crate::commands;
+use crate::core::repository::Repository;
+use crate::core::repository::SqliteRepository;
 use crate::core::validator;
 use anyhow::anyhow;
 use anyhow::ensure;
 use anyhow::Result;
 use thiserror::Error;
 use tracing::instrument;
-use tracing::{debug, error, info, span, warn, Level};
-
-#[derive(Debug)]
-pub struct Data {}
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
-
-#[derive(Debug, Error)]
-enum SubErrors {
-    #[error("The given RSS feed URL is not valid")]
-    InvalidFeedUrl,
-    #[error("Unexpected internal error arose while processing subscription")]
-    InternalError(#[from] anyhow::Error),
-}
+use tracing::{error, info};
 
 #[derive(Debug)]
 struct SubRequest<'a> {
@@ -28,12 +17,20 @@ struct SubRequest<'a> {
     feed_url: &'a str,
 }
 
+#[derive(Debug, Error)]
+enum SubErrors {
+    #[error("The given RSS feed URL is not valid")]
+    InvalidFeedUrl,
+    #[error("Unexpected internal error arose while processing subscription")]
+    InternalError(#[from] anyhow::Error),
+}
+
 #[instrument(skip(ctx))]
 #[poise::command(slash_command, prefix_command)]
 pub async fn sub(
-    ctx: Context<'_>,
+    ctx: commands::Context<'_>,
     #[description = "RSS feed URL to subscribe channel to"] feed_url: Option<String>,
-) -> Result<(), Error> {
+) -> Result<(), commands::Error> {
     match feed_url {
         None => {
             let _future = ctx.reply("You must provide a value for feed_url").await?;
@@ -51,7 +48,10 @@ pub async fn sub(
                 username: &username,
             };
 
-            let sub_response = handle_sub(&sub_request).await;
+            let repo = SqliteRepository {};
+            let sub_handler = SubHandler::new(repo);
+
+            let sub_response = sub_handler.handle_sub(&sub_request).await;
 
             match sub_response {
                 Ok(_) => {
@@ -68,7 +68,9 @@ pub async fn sub(
                         Some(SubErrors::InternalError(..)) => {
                             let _ = ctx.say("The bot experienced an unexpected error. Please try again later").await?;
                         }
-                        None => (),
+                        None => {
+                            let _ = ctx.say("The bot experienced an unexpected error. Please try again later").await?;
+                        }
                     };
                     return Err(error.into());
                 }
@@ -77,32 +79,44 @@ pub async fn sub(
     }
 }
 
-#[instrument()]
-async fn handle_sub(sub_request: &SubRequest<'_>) -> Result<(), anyhow::Error> {
-    info!("Processing SubRequest");
-
-    let is_valid_url = validator::validate_feed_url(sub_request.feed_url);
-    ensure!(is_valid_url.is_ok(), anyhow!(SubErrors::InvalidFeedUrl));
-
-    // TODO: trim URL before inserting. Want to decrease risk of same URL with non-meaningful
-    // characters creating duplicate entries
-
-    let save_feed_result = repository::save_feed(sub_request.feed_url).await;
-    ensure!(
-        save_feed_result.is_ok(),
-        anyhow!(SubErrors::InternalError(anyhow!(save_feed_result
-            .err()
-            .unwrap())))
-    );
-
-    let id = save_feed_result.unwrap();
-    let save_sub_result = repository::save_sub(&id, sub_request.channel_id).await;
-    ensure!(
-        save_sub_result.is_ok(),
-        anyhow!(SubErrors::InternalError(anyhow!(save_sub_result
-            .err()
-            .unwrap())))
-    );
-
-    return Ok(());
+pub struct SubHandler<T: Repository> {
+    repository: T
 }
+
+impl<T: Repository> SubHandler<T> {
+    fn new(repository: T) -> Self {
+        return Self { repository };
+    }
+
+    #[instrument(skip(self))]
+    async fn handle_sub(&self, sub_request: &SubRequest<'_>) -> Result<(), anyhow::Error> {
+        info!("Processing SubRequest");
+
+        let is_valid_url = validator::validate_feed_url(sub_request.feed_url);
+        ensure!(is_valid_url.is_ok(), anyhow!(SubErrors::InvalidFeedUrl));
+
+        // TODO: trim URL before inserting. Want to decrease risk of same URL with non-meaningful
+        // characters creating duplicate entries
+
+        let save_feed_result = self.repository.save_feed(sub_request.feed_url).await;
+
+        ensure!(
+            save_feed_result.is_ok(),
+            anyhow!(SubErrors::InternalError(anyhow!(save_feed_result
+                .err()
+                .unwrap())))
+        );
+
+        let id = save_feed_result.unwrap();
+        let save_sub_result = self.repository.save_sub(&id, sub_request.channel_id).await;
+        ensure!(
+            save_sub_result.is_ok(),
+            anyhow!(SubErrors::InternalError(anyhow!(save_sub_result
+                .err()
+                .unwrap())))
+        );
+
+        return Ok(());
+    }
+}
+
