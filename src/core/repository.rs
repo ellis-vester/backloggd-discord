@@ -4,6 +4,9 @@ use anyhow::Result;
 use libsql::params;
 use libsql::Builder;
 
+use super::converter;
+use super::models::RssFeed;
+
 pub trait Repository {
     async fn init_database(&self) -> Result<(), Error>;
     async fn save_feed(&self, feed_url: &str) -> Result<i64, Error>;
@@ -11,6 +14,7 @@ pub trait Repository {
     async fn save_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
     async fn delete_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
     async fn get_subs(&self, channel_id: &u64) -> Result<Vec<String>, Error>;
+    async fn get_next_unpublished_subs(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error>;
 }
 
 pub struct SqliteRepository {}
@@ -161,5 +165,57 @@ impl Repository for SqliteRepository {
             .await?;
 
         Ok(())
+    }
+
+    async fn get_next_unpublished_subs(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error> {
+        let database = Builder::new_local("/var/lib/backloggd-discord/db")
+            .build()
+            .await?;
+        let connection = database.connect()?;
+
+        // Get the identifier of the just inserted URL
+        let mut rows = connection
+            .query(
+                "SELECT TOP (?1) Id, Url, LastChecked, Etag  FROM RssFeeds ORDER BY LastChecked ASC",
+                params!(number),
+            )
+            .await?;
+
+        let row_option = rows.next().await?;
+
+        let mut rss_feeds : Vec<RssFeed> = vec!();
+
+        match row_option {
+            Some(row) => {
+                let id_value = row.get_value(0)?;
+                let id_option = id_value.as_integer();
+                let url = row.get_str(1)?;
+                let last_checked = converter::parse_sqlite_date(row.get_str(2)?)?;
+                let etag = row.get_str(3)?;
+
+                match id_option {
+                    Some(id) => {
+                        rss_feeds.push(RssFeed {
+                            id: *id,
+                            url: url.to_string(),
+                            last_checked,
+                            etag: etag.to_string()
+                        })
+                    },
+                    None => { return Err(anyhow!("Unable to parse RssFeeds.Id to integer")); }
+                }
+            }
+            None => {
+                return Err(anyhow!(
+                    "No feeds to publish"
+                ))
+            }
+        }
+
+        if rss_feeds.len() > 0 {
+            return Ok(Some(rss_feeds))
+        }
+
+        Ok(None)
     }
 }
