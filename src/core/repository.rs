@@ -6,6 +6,7 @@ use libsql::Builder;
 
 use super::converter;
 use super::models::RssFeed;
+use super::models::Subscription;
 
 pub trait Repository {
     async fn init_database(&self) -> Result<(), Error>;
@@ -13,8 +14,9 @@ pub trait Repository {
     async fn delete_feed(&self, id: &i64) -> Result<(), Error>;
     async fn save_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
     async fn delete_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
-    async fn get_subs(&self, channel_id: &u64) -> Result<Vec<String>, Error>;
-    async fn get_next_unpublished_subs(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error>;
+    async fn get_channel_feeds(&self, channel_id: &u64) -> Result<Vec<String>, Error>;
+    async fn get_next_unpublished_feed(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error>;
+    async fn get_subs(&self, feed_id: i64) -> Result<Vec<Subscription>, Error>;
 }
 
 pub struct SqliteRepository {}
@@ -110,7 +112,7 @@ impl Repository for SqliteRepository {
         Ok(())
     }
 
-    async fn get_subs(&self, channel_id: &u64) -> Result<Vec<String>, Error> {
+    async fn get_channel_feeds(&self, channel_id: &u64) -> Result<Vec<String>, Error> {
         let database = Builder::new_local("/var/lib/backloggd-discord/db")
             .build()
             .await?;
@@ -145,12 +147,15 @@ impl Repository for SqliteRepository {
         let connection = database.connect()?;
 
         let _ = connection
-            .execute(r#"CREATE TABLE IF NOT EXISTS "RssFeeds" (
+            .execute(
+                r#"CREATE TABLE IF NOT EXISTS "RssFeeds" (
                             "Id"    INTEGER,
                             "Url"   TEXT NOT NULL UNIQUE,
                             "LastChecked"   TEXT NOT NULL DEFAULT '2025-01-01T00:00:00',
                             PRIMARY KEY("Id" AUTOINCREMENT)
-                        );"#, params!())
+                        );"#,
+                params!(),
+            )
             .await?;
 
         let _ = connection
@@ -161,13 +166,15 @@ impl Repository for SqliteRepository {
                         "ChannelId"	INTEGER NOT NULL,
                         PRIMARY KEY("Id" AUTOINCREMENT),
                         FOREIGN KEY("RssFeedId") REFERENCES "RssFeeds"("Id")
-                    );"#, params!())
+                    );"#,
+                params!(),
+            )
             .await?;
 
         Ok(())
     }
 
-    async fn get_next_unpublished_subs(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error> {
+    async fn get_next_unpublished_feed(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error> {
         let database = Builder::new_local("/var/lib/backloggd-discord/db")
             .build()
             .await?;
@@ -183,7 +190,7 @@ impl Repository for SqliteRepository {
 
         let row_option = rows.next().await?;
 
-        let mut rss_feeds : Vec<RssFeed> = vec!();
+        let mut rss_feeds: Vec<RssFeed> = vec![];
 
         match row_option {
             Some(row) => {
@@ -194,28 +201,55 @@ impl Repository for SqliteRepository {
                 let etag = row.get_str(3)?;
 
                 match id_option {
-                    Some(id) => {
-                        rss_feeds.push(RssFeed {
-                            id: *id,
-                            url: url.to_string(),
-                            last_checked,
-                            etag: etag.to_string()
-                        })
-                    },
-                    None => { return Err(anyhow!("Unable to parse RssFeeds.Id to integer")); }
+                    Some(id) => rss_feeds.push(RssFeed {
+                        id: *id,
+                        url: url.to_string(),
+                        last_checked,
+                        etag: etag.to_string(),
+                    }),
+                    None => {
+                        return Err(anyhow!("Unable to parse RssFeeds.Id to integer"));
+                    }
                 }
             }
-            None => {
-                return Err(anyhow!(
-                    "No feeds to publish"
-                ))
-            }
+            None => return Err(anyhow!("No feeds to publish")),
         }
 
         if rss_feeds.len() > 0 {
-            return Ok(Some(rss_feeds))
+            return Ok(Some(rss_feeds));
         }
 
         Ok(None)
+    }
+
+    async fn get_subs(&self, feed_id: i64) -> Result<Vec<Subscription>, Error> {
+        let database = Builder::new_local("/var/lib/backloggd-discord/db")
+            .build()
+            .await?;
+        let connection = database.connect()?;
+
+        let mut rows = connection
+            .query(
+                "SELECT Id, RssFeedId, ChannelId  FROM Subscriptions WHERE RssFeedId = (?1)",
+                params!(feed_id),
+            )
+            .await?;
+
+        let mut subs: Vec<Subscription> = vec![];
+
+        loop {
+            let row_option = rows.next().await?;
+
+            match row_option {
+                Some(row) => subs.push(Subscription {
+                    id: row.get(0).unwrap(),
+                    rss_feed_id: row.get(1).unwrap(),
+                    channel_id: row.get(2).unwrap(),
+                }),
+                None => break,
+            }
+        }
+
+        Ok(subs)
     }
 }

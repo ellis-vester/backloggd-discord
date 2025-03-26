@@ -17,7 +17,7 @@ pub async fn list(ctx: commands::Context<'_>) -> Result<(), commands::Error> {
 
     let repo = SqliteRepository {};
 
-    let subs = repo.get_subs(&channel_id).await?;
+    let subs = repo.get_channel_feeds(&channel_id).await?;
 
     let embed = build_sub_list_embed(subs);
 
@@ -27,8 +27,7 @@ pub async fn list(ctx: commands::Context<'_>) -> Result<(), commands::Error> {
 }
 
 fn build_sub_list_embed(subs: Vec<String>) -> CreateEmbed {
-
-    let mut description : String = "".to_string();
+    let mut description: String = "".to_string();
 
     for sub in subs {
         let item = format!(" - {}\n", sub);

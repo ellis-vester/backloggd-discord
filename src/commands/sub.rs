@@ -79,8 +79,8 @@ pub async fn sub(
     }
 }
 
-pub struct SubHandler<T: Repository> {
-    repository: T
+pub struct SubHandler<R: Repository> {
+    repository: R,
 }
 
 impl<T: Repository> SubHandler<T> {
@@ -119,4 +119,3 @@ impl<T: Repository> SubHandler<T> {
         return Ok(());
     }
 }
-
