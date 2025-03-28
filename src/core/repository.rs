@@ -183,7 +183,7 @@ impl Repository for SqliteRepository {
         // Get the identifier of the just inserted URL
         let mut rows = connection
             .query(
-                "SELECT TOP (?1) Id, Url, LastChecked, Etag  FROM RssFeeds ORDER BY LastChecked ASC",
+                "SELECT Id, Url, LastChecked, Etag  FROM RssFeeds ORDER BY LastChecked ASC LIMIT (?1)",
                 params!(number),
             )
             .await?;

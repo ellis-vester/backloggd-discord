@@ -8,7 +8,9 @@ use anyhow::Error;
 use poise::serenity_prelude::Http;
 use poise::serenity_prelude::{self, Color, CreateEmbed};
 use std::sync::Arc;
-use tracing::instrument;
+use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
+use tracing::{info, instrument};
 
 pub struct Publisher<S, R>
 where
@@ -21,7 +23,7 @@ where
 }
 
 impl<S: Scraper, R: Repository> Publisher<S, R> {
-    fn new(scraper: S, repository: R, ctx: Arc<Http>) -> Self {
+    pub fn new(scraper: S, repository: R, ctx: Arc<Http>) -> Self {
         return Self {
             scraper,
             repository,
@@ -29,65 +31,71 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
         };
     }
 
+    // TODO: refactor and un-nest this code.
     #[instrument(skip(self))]
-    async fn event_loop(&self) -> Result<(), Error> {
-        // Get next X items from RssFeeds
-        // For each
-        //      Fetch the RssFeed from Backloggd
-        //          if content -> publish
-        //          else -> nothing
-        //      Update Database with new etag and update time
-        // Fetch next 20 items after delay of X minutes
+    pub async fn event_loop(&self, cancellation_token: CancellationToken) -> Result<(), Error> {
+        while !cancellation_token.is_cancelled() {
+            info!("Started publisher");
+            let feeds_option = self.repository.get_next_unpublished_feed(1).await?;
 
-        let feeds_option = self.repository.get_next_unpublished_feed(1).await?;
+            match feeds_option {
+                Some(feeds) => {
+                    for feed in feeds {
+                        info!("Processing feed {}", feed.url);
+                        let request = RssRequest {
+                            url: feed.url,
+                            etag: feed.etag,
+                        };
 
-        match feeds_option {
-            Some(feeds) => {
-                for feed in feeds {
-                    let request = RssRequest {
-                        url: feed.url,
-                        etag: feed.etag,
-                    };
+                        let rss_response = self.scraper.get_rss_feed_content(&request).await?;
 
-                    let rss_response = self.scraper.get_rss_feed_content(&request).await?;
+                        match rss_response.content {
+                            Some(content) => {
+                                let etag = match rss_response.etag {
+                                    Some(value) => value,
+                                    None => "".to_string(),
+                                };
 
-                    match rss_response.content {
-                        Some(content) => {
-                            let etag = match rss_response.etag {
-                                Some(value) => value,
-                                None => "".to_string(),
-                            };
+                                info!("Got RSS content from server with etag {}", etag);
 
-                            let rss_feed = parser::parse_rss_xml(&content)?;
+                                let rss_feed = parser::parse_rss_xml(&content)?;
 
-                            for item in &rss_feed.channel.item {
-                                if converter::parse_backloggd_rss_date(&item.pub_date)?
-                                    > feed.last_checked
-                                {
-                                    continue;
+                                for item in &rss_feed.channel.item {
+                                    if converter::parse_backloggd_rss_date(&item.pub_date)?
+                                        > feed.last_checked
+                                    {
+                                        continue;
+                                    }
+                                    let embed = &self.build_review_embed(&rss_feed.channel, &item);
+
+                                    // Get all subs for feed
+                                    let subs = self.repository.get_subs(feed.id).await?;
+
+                                    for sub in subs {
+                                        let channel = poise::serenity_prelude::ChannelId::from(
+                                            sub.channel_id,
+                                        );
+                                        let message = poise::serenity_prelude::CreateMessage::new()
+                                            .add_embed(embed.clone());
+                                        channel.send_message(&self.ctx, message).await?;
+                                    }
                                 }
-                                let embed = &self.build_review_embed(&rss_feed.channel, &item);
 
-                                // Get all subs for feed
-                                let subs = self.repository.get_subs(feed.id).await?;
-
-                                for sub in subs {
-                                    let channel =
-                                        poise::serenity_prelude::ChannelId::from(sub.channel_id);
-                                    let message = poise::serenity_prelude::CreateMessage::new()
-                                        .add_embed(embed.clone());
-                                    channel.send_message(&self.ctx, message).await?;
-                                }
+                                // TODO: update database with new etag and update time
+                                // TODO: add some logging so checks can be monitored.
                             }
-
-                            // TODO: update database with new etag and update time
-                            // TODO: add some logging so checks can be monitored.
+                            None => {
+                                info!("No response from server for feed {}", request.url);
+                            }
                         }
-                        None => {}
                     }
                 }
+                None => {
+                    info!("Nothing in database");
+                }
             }
-            None => {}
+
+            tokio::time::sleep(Duration::from_secs(3600)).await;
         }
 
         return Ok(());

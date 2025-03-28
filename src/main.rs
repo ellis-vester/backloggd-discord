@@ -2,13 +2,22 @@ pub mod commands;
 pub mod core;
 pub mod test;
 
-use core::repository::Repository;
+use core::publisher::Publisher;
+use core::repository::{Repository, SqliteRepository};
+use core::scraper::{ReqwestScraper, Scraper};
+use std::sync::Arc;
 
 use crate::core::config;
+use tokio::signal::unix::SignalKind;
+use tokio_util::task::TaskTracker;
 
 use opentelemetry::global;
 use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use poise::serenity_prelude as serenity;
+use reqwest::Client;
+use tokio_util::sync::CancellationToken;
+use tracing::error;
+use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, EnvFilter};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -98,11 +107,57 @@ async fn main() {
 
     global::set_tracer_provider(provider.clone());
 
-    // TODO: Add background process to publish review subscriptions.
-
     // Init database
     let repo = crate::core::repository::SqliteRepository {};
     repo.init_database().await.unwrap();
 
-    serenity_client.unwrap().start().await.unwrap();
+    // TODO: Break out into function
+    let client = Client::new();
+    let scraper = ReqwestScraper::new(client);
+
+    let context = poise::serenity_prelude::Http::new(&discord_token);
+
+    let publisher = Publisher::new(scraper, SqliteRepository {}, Arc::new(context));
+
+    let token = CancellationToken::new();
+    let local_token = token.clone();
+
+    let task_tracker = TaskTracker::new();
+
+    info!("Starting publisher.");
+    // TODO: Panic if this look errors?
+    task_tracker.spawn(async move {
+        match publisher.event_loop(token).await {
+            Ok(_) => {
+                info!("publisher returned okay");
+            }
+            Err(error) => {
+                error!(error = ?error, "publisher errored out", );
+            }
+        }
+    });
+
+    info!("Starting serenity.");
+    // TODO: Panic if this crashes?
+    task_tracker.spawn(async move {
+        return serenity_client.unwrap().start().await;
+    });
+
+    task_tracker.close();
+
+    let mut sig = tokio::signal::unix::signal(SignalKind::terminate()).unwrap();
+
+    info!("waiting for shutdown...");
+    match sig.recv().await {
+        Some(_) => {
+            info!("Recieved signal.");
+            local_token.cancel();
+        }
+        None => {
+            info!("Recieved signal.");
+            local_token.cancel();
+        }
+    }
+
+    task_tracker.wait().await;
 }

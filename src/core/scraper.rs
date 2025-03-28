@@ -20,6 +20,12 @@ pub struct ReqwestScraper {
     client: Client,
 }
 
+impl ReqwestScraper {
+    pub fn new(client: Client) -> Self {
+        return ReqwestScraper { client };
+    }
+}
+
 impl Scraper for ReqwestScraper {
     async fn get_rss_feed_content(&self, request: &RssRequest) -> Result<RssResponse, Error> {
         let response = self
