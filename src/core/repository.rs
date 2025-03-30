@@ -152,6 +152,7 @@ impl Repository for SqliteRepository {
                             "Id"    INTEGER,
                             "Url"   TEXT NOT NULL UNIQUE,
                             "LastChecked"   TEXT NOT NULL DEFAULT '2025-01-01T00:00:00',
+                            "Etag"          TEXT,
                             PRIMARY KEY("Id" AUTOINCREMENT)
                         );"#,
                 params!(),
@@ -212,7 +213,7 @@ impl Repository for SqliteRepository {
                     }
                 }
             }
-            None => return Err(anyhow!("No feeds to publish")),
+            None => return Ok(None),
         }
 
         if rss_feeds.len() > 0 {

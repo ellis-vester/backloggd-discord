@@ -7,6 +7,7 @@ use super::{
 use anyhow::Error;
 use poise::serenity_prelude::Http;
 use poise::serenity_prelude::{self, Color, CreateEmbed};
+use tokio::select;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
@@ -91,11 +92,19 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
                     }
                 }
                 None => {
-                    info!("Nothing in database");
+                    info!("No RssFeed entries to publish");
                 }
             }
 
-            tokio::time::sleep(Duration::from_secs(3600)).await;
+
+            select!(
+                _ = cancellation_token.cancelled() => {
+                    info!("publisher cancelled");
+                },
+                _ = tokio::time::sleep(Duration::from_secs(3600)) => {
+                    info!("publisher sleep over");
+                }
+            );
         }
 
         return Ok(());

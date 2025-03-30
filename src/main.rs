@@ -59,7 +59,8 @@ async fn main() {
 
     let serenity_client = serenity::ClientBuilder::new(&discord_token, intents)
         .framework(framework)
-        .await;
+        .await
+        .unwrap();
 
     let filter = tracing_subscriber::filter::EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
@@ -138,10 +139,11 @@ async fn main() {
     });
 
     info!("Starting serenity.");
-    // TODO: Panic if this crashes?
-    task_tracker.spawn(async move {
-        return serenity_client.unwrap().start().await;
-    });
+let serenity_future = serenity_client.start();
+// TODO: Panic if this crashes?
+task_tracker.spawn(async move {
+    return serenity_future.await;
+});
 
     task_tracker.close();
 
@@ -152,6 +154,7 @@ async fn main() {
         Some(_) => {
             info!("Recieved signal.");
             local_token.cancel();
+            serenity_client.shard_manager.shutdown_all().await;
         }
         None => {
             info!("Recieved signal.");
