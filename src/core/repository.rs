@@ -3,6 +3,7 @@ use anyhow::Error;
 use anyhow::Result;
 use libsql::params;
 use libsql::Builder;
+use tracing::info;
 
 use super::converter;
 use super::models::RssFeed;
@@ -31,8 +32,8 @@ impl Repository for SqliteRepository {
 
         connection
             .execute(
-                "INSERT OR IGNORE INTO RssFeeds (Url) values (?1)",
-                params!(feed_url),
+                "INSERT OR IGNORE INTO RssFeeds (Url, LastChecked, Etag) values (?1, ?2, 'default')",
+                params!(feed_url, converter::get_sqlite_now()),
             )
             .await?;
 
@@ -203,38 +204,42 @@ impl Repository for SqliteRepository {
             )
             .await?;
 
-        let row_option = rows.next().await?;
-
         let mut rss_feeds: Vec<RssFeed> = vec![];
 
-        match row_option {
-            Some(row) => {
-                let id_value = row.get_value(0)?;
-                let id_option = id_value.as_integer();
-                let url = row.get_str(1)?;
-                let last_checked = converter::parse_sqlite_date(row.get_str(2)?)?;
-                let etag = row.get_str(3)?;
+        loop { 
+            let row_option = rows.next().await?;
 
-                match id_option {
-                    Some(id) => rss_feeds.push(RssFeed {
-                        id: *id,
-                        url: url.to_string(),
-                        last_checked,
-                        etag: etag.to_string(),
-                    }),
-                    None => {
-                        return Err(anyhow!("Unable to parse RssFeeds.Id to integer"));
+            match row_option {
+                Some(row) => {
+                    let id_value = row.get_value(0)?;
+                    let id_option = id_value.as_integer();
+                    let url = row.get_str(1)?;
+                    let last_checked = converter::parse_sqlite_date(row.get_str(2)?)?;
+                    let etag = row.get_str(3)?;
+
+                    info!("Found feed {} in database", url);
+
+                    match id_option {
+                        Some(id) => rss_feeds.push(RssFeed {
+                            id: *id,
+                            url: url.to_string(),
+                            last_checked,
+                            etag: etag.to_string(),
+                        }),
+                        None => {
+                            return Err(anyhow!("Unable to parse RssFeeds.Id to integer"));
+                        }
                     }
                 }
+                None => break
             }
-            None => return Ok(None),
         }
 
         if rss_feeds.len() > 0 {
             return Ok(Some(rss_feeds));
         }
 
-        Ok(None)
+        return Ok(None);
     }
 
     async fn get_subs(&self, feed_id: i64) -> Result<Vec<Subscription>, Error> {

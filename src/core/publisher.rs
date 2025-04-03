@@ -37,7 +37,7 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
     pub async fn event_loop(&self, cancellation_token: CancellationToken) -> Result<(), Error> {
         while !cancellation_token.is_cancelled() {
             info!("Started publisher");
-            let feeds_option = self.repository.get_next_unpublished_feed(1).await?;
+            let feeds_option = self.repository.get_next_unpublished_feed(5).await?;
 
             match feeds_option {
                 Some(feeds) => {
@@ -63,9 +63,9 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
 
                                 for item in &rss_feed.channel.item {
                                     if converter::parse_backloggd_rss_date(&item.pub_date)?
-                                        > feed.last_checked
+                                        < feed.last_checked
                                     {
-                                        continue;
+                                        break;
                                     }
                                     let embed = &self.build_review_embed(&rss_feed.channel, &item);
 
@@ -118,12 +118,16 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
         let footer =
             poise::serenity_prelude::CreateEmbedFooter::new(format!("🩷 {}  •  💬 {} ", 0, 0));
 
+        let mut truncated_review = rss_item.description.clone();
+        truncated_review.truncate(1000);
+        truncated_review.push_str("...");
+
         return poise::serenity_prelude::CreateEmbed::new()
             .url(&rss_item.link)
             .color(Color::from_rgb(252, 99, 153))
             .title(&rss_item.title)
             .thumbnail(&rss_item.image.url)
-            .description(&rss_item.description)
+            .description(truncated_review)
             .footer(footer)
             .author(author);
     }
