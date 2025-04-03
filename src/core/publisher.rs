@@ -82,8 +82,9 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
                                     }
                                 }
 
-                                // TODO: update database with new etag and update time
-                                // TODO: add some logging so checks can be monitored.
+                                info!("Updating RssFeed {} with Etag {}", feed.id, etag);
+
+                                self.repository.update_feed(&feed.id, &converter::get_sqlite_now(), &etag).await?;
                             }
                             None => {
                                 info!("No response from server for feed {}", request.url);
@@ -95,7 +96,6 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
                     info!("No RssFeed entries to publish");
                 }
             }
-
 
             select!(
                 _ = cancellation_token.cancelled() => {

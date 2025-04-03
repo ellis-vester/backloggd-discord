@@ -11,6 +11,7 @@ use super::models::Subscription;
 pub trait Repository {
     async fn init_database(&self) -> Result<(), Error>;
     async fn save_feed(&self, feed_url: &str) -> Result<i64, Error>;
+    async fn update_feed(&self, id: &i64, last_checked: &str, etag: &str) -> Result<(), Error>;
     async fn delete_feed(&self, id: &i64) -> Result<(), Error>;
     async fn save_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
     async fn delete_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
@@ -65,6 +66,19 @@ impl Repository for SqliteRepository {
                 ))
             }
         }
+    }
+
+    async fn update_feed(&self, id: &i64, last_checked: &str, etag: &str) -> Result<(), Error> {
+        let database = Builder::new_local("/var/lib/backloggd-discord/db")
+            .build()
+            .await?;
+        let connection = database.connect()?;
+
+        connection
+            .execute("UPDATE RssFeeds SET LastChecked = (?1), Etag = (?2) WHERE Id = (?3)", params!(last_checked, etag, id))
+            .await?;
+
+        Ok(())
     }
 
     async fn delete_feed(&self, id: &i64) -> Result<(), Error> {

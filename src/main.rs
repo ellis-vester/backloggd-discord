@@ -57,7 +57,7 @@ async fn main() {
         })
         .build();
 
-    let serenity_client = serenity::ClientBuilder::new(&discord_token, intents)
+    let mut serenity_client = serenity::ClientBuilder::new(&discord_token, intents)
         .framework(framework)
         .await
         .unwrap();
@@ -139,11 +139,7 @@ async fn main() {
     });
 
     info!("Starting serenity.");
-let serenity_future = serenity_client.start();
-// TODO: Panic if this crashes?
-task_tracker.spawn(async move {
-    return serenity_future.await;
-});
+    serenity_client.start().await.unwrap();
 
     task_tracker.close();
 
@@ -152,12 +148,12 @@ task_tracker.spawn(async move {
     info!("waiting for shutdown...");
     match sig.recv().await {
         Some(_) => {
-            info!("Recieved signal.");
+            info!("Received None signal.");
             local_token.cancel();
             serenity_client.shard_manager.shutdown_all().await;
         }
         None => {
-            info!("Recieved signal.");
+            info!("Received None signal.");
             local_token.cancel();
         }
     }
