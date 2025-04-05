@@ -67,23 +67,24 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
                                     {
                                         break;
                                     }
+
                                     let embed = &self.build_review_embed(&rss_feed.channel, &item);
-
-                                    // Get all subs for feed
-                                    let subs = self.repository.get_subs(feed.id).await?;
-
-                                    for sub in subs {
-                                        let channel = poise::serenity_prelude::ChannelId::from(
-                                            sub.channel_id,
-                                        );
-                                        let message = poise::serenity_prelude::CreateMessage::new()
-                                            .add_embed(embed.clone());
-                                        channel.send_message(&self.ctx, message).await?;
+                                    match self.repository.get_subs(feed.id).await? {
+                                        Some(subs) => {
+                                            for sub in subs {
+                                                let channel = poise::serenity_prelude::ChannelId::from(
+                                                    sub.channel_id,
+                                                );
+                                                let message = poise::serenity_prelude::CreateMessage::new()
+                                                    .add_embed(embed.clone());
+                                                channel.send_message(&self.ctx, message).await?;
+                                            }
+                                        },
+                                        None => break
                                     }
                                 }
 
                                 info!("Updating RssFeed {} with Etag {}", feed.id, etag);
-
                                 self.repository.update_feed(&feed.id, &converter::get_sqlite_now(), &etag).await?;
                             }
                             None => {
