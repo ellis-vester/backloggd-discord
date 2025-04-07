@@ -1,4 +1,5 @@
 use anyhow::Error;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_xml_rs::from_str;
 
@@ -20,7 +21,8 @@ pub struct RssItem {
     pub title: String,
     pub link: String,
     #[serde(rename = "pubDate")]
-    pub pub_date: String,
+    #[serde(with = "backloggd_date_format")]
+    pub pub_date: NaiveDateTime,
     pub description: String,
     pub guid: String,
     pub user_rating: i8,
@@ -45,4 +47,32 @@ pub fn parse_rss_xml(rss_xml: &str) -> Result<Rss, Error> {
     let document: Rss = from_str(&namespace_stripped)?;
 
     return Ok(document);
+}
+
+mod backloggd_date_format {
+    use chrono::NaiveDateTime;
+    use serde::{self, Deserialize, Serializer, Deserializer};
+
+    use crate::core::converter;
+    pub fn serialize<S>(
+        date: &NaiveDateTime,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Not doing any serializing
+        todo!()
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<NaiveDateTime, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let dt = converter::parse_backloggd_rss_date(&s).unwrap();
+        Ok(dt)
+    }
 }
