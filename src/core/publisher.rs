@@ -112,10 +112,16 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
                     .unwrap_or("https://backloggd.com/favicon.ico".to_string());
 
                 for item in fresh_items {
-                    
                     let review_metadata = self.scraper.get_review_metadata(&item.link).await;
 
-                    let embed = &self.build_review_embed(&rss_feed.channel, item, &profile_pic_url, "", "", "");
+                    let embed = &self.build_review_embed(
+                        &rss_feed.channel,
+                        item,
+                        &profile_pic_url,
+                        "",
+                        "",
+                        "",
+                    );
                     for sub in &subs {
                         let channel = poise::serenity_prelude::ChannelId::from(sub.channel_id);
                         let message =
@@ -147,14 +153,16 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
         profile_pic_url: &str,
         likes_count: &str,
         comments_count: &str,
-        status: &str
+        status: &str,
     ) -> CreateEmbed {
         let author = poise::serenity_prelude::CreateEmbedAuthor::new(&rss_item.reviewer)
             .url(&channel.link)
             .icon_url(profile_pic_url);
 
-        let footer =
-            poise::serenity_prelude::CreateEmbedFooter::new(format!("{} •  🩷 {}  •  💬 {} ", status, likes_count, comments_count));
+        let footer = poise::serenity_prelude::CreateEmbedFooter::new(format!(
+            "{} •  🩷 {}  •  💬 {} ",
+            status, likes_count, comments_count
+        ));
 
         // TODO: truncate a bit more nicely, ending on a word not potentially halfway through one
         let mut truncated_review = rss_item.description.clone();
@@ -171,9 +179,7 @@ impl<S: Scraper, R: Repository> Publisher<S, R> {
             .author(author);
     }
 
-    fn build_footer(
-        review_metadata: Option<ReviewMetadata>
-    ) -> String {
+    fn build_footer(review_metadata: Option<ReviewMetadata>) -> String {
         if let Some(metadata) = review_metadata {
             let mut footer = "".to_string();
 

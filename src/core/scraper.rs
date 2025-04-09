@@ -22,7 +22,7 @@ pub struct RssRequest {
 pub struct ReviewMetadata {
     pub likes: Option<String>,
     pub comments: Option<String>,
-    pub status: Option<String>
+    pub status: Option<String>,
 }
 
 pub struct ReqwestScraper {
@@ -97,8 +97,7 @@ impl Scraper for ReqwestScraper {
     }
 
     async fn get_review_metadata(&self, review_url: &str) -> Option<ReviewMetadata> {
-
-        if let Ok(response) = self. client.get(review_url).send().await {
+        if let Ok(response) = self.client.get(review_url).send().await {
             if response.status() == StatusCode::OK {
                 if let Ok(content) = response.text().await {
                     return Some(parse_review_metadata(&content));
@@ -120,12 +119,11 @@ pub fn parse_review_metadata(html: &str) -> ReviewMetadata {
     ReviewMetadata {
         likes: likes_count,
         comments: comments_count,
-        status: status_text
+        status: status_text,
     }
 }
 
 pub fn parse_review_likes(document: &Html) -> Option<String> {
-
     let likes = scraper::Selector::parse("p.like-counter").ok()?;
     let likes_p = document.select(&likes).next()?;
     let likes_count = likes_p.first_child()?.value().as_element()?.attr("likes")?;
@@ -134,16 +132,17 @@ pub fn parse_review_likes(document: &Html) -> Option<String> {
 }
 
 pub fn parse_review_comments(document: &Html) -> Option<String> {
-
     let comments = scraper::Selector::parse("h2#comments-header").ok()?;
     let comments_h2 = document.select(&comments).next()?;
-    let comments_count = comments_h2.inner_html().replace(" Comments", "").replace(r#"<i class="fas fa-comments-alt"></i>"#, "");
+    let comments_count = comments_h2
+        .inner_html()
+        .replace(" Comments", "")
+        .replace(r#"<i class="fas fa-comments-alt"></i>"#, "");
 
     Some(comments_count)
 }
 
 pub fn parse_status_text(document: &Html) -> Option<String> {
-
     let status = scraper::Selector::parse("p.play-type").ok()?;
     let status_p = document.select(&status).next()?;
     let status_text = status_p.inner_html();

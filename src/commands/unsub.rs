@@ -1,15 +1,15 @@
-use anyhow::Error;
-use tracing::instrument;
 use crate::commands;
 use crate::core::repository::Repository;
 use crate::core::repository::SqliteRepository;
 use crate::core::validator;
 use anyhow::anyhow;
 use anyhow::ensure;
+use anyhow::Error;
 use anyhow::Result;
 use thiserror::Error;
-use tracing::info;
 use tracing::error;
+use tracing::info;
+use tracing::instrument;
 
 #[derive(Debug)]
 struct UnsubRequest<'a> {
@@ -98,7 +98,9 @@ impl<T: Repository> SubHandler<T> {
         ensure!(is_valid_url.is_ok(), anyhow!(UnsubErrors::InvalidFeedUrl));
 
         let feed_id = self.repository.get_feed_id(unsub_request.feed_url).await?;
-        self.repository.delete_sub(&feed_id, unsub_request.channel_id).await?;
+        self.repository
+            .delete_sub(&feed_id, unsub_request.channel_id)
+            .await?;
 
         Ok(())
     }

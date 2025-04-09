@@ -23,13 +23,11 @@ pub trait Repository {
 
 pub struct SqliteRepository {}
 
-const DATABASE_PATH : &str = "/var/lib/backloggd-discord/db";
+const DATABASE_PATH: &str = "/var/lib/backloggd-discord/db";
 
 impl Repository for SqliteRepository {
     async fn save_feed(&self, feed_url: &str) -> Result<i64, Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         connection
@@ -72,22 +70,21 @@ impl Repository for SqliteRepository {
     }
 
     async fn update_feed(&self, id: &i64, last_checked: &str, etag: &str) -> Result<(), Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         connection
-            .execute("UPDATE RssFeeds SET LastChecked = (?1), Etag = (?2) WHERE Id = (?3)", params!(last_checked, etag, id))
+            .execute(
+                "UPDATE RssFeeds SET LastChecked = (?1), Etag = (?2) WHERE Id = (?3)",
+                params!(last_checked, etag, id),
+            )
             .await?;
 
         Ok(())
     }
 
     async fn delete_feed(&self, id: &i64) -> Result<(), Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         connection
@@ -98,9 +95,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn save_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         connection
@@ -114,9 +109,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn delete_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         connection
@@ -130,9 +123,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn get_channel_feeds(&self, channel_id: &u64) -> Result<Vec<String>, Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         let mut row_options = connection
@@ -158,9 +149,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn init_database(&self) -> Result<(), Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         let _ = connection
@@ -193,9 +182,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn get_next_unpublished_feed(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         // Get the identifier of the just inserted URL
@@ -208,8 +195,7 @@ impl Repository for SqliteRepository {
 
         let mut rss_feeds: Vec<RssFeed> = vec![];
 
-        while let Some(row) = rows.next().await? { 
-
+        while let Some(row) = rows.next().await? {
             let id_value = row.get_value(0)?;
             let id_option = id_value.as_integer();
             let url = row.get_str(1)?;
@@ -237,9 +223,7 @@ impl Repository for SqliteRepository {
     }
 
     async fn get_subs(&self, feed_id: i64) -> Result<Option<Vec<Subscription>>, Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         let mut rows = connection
@@ -260,16 +244,14 @@ impl Repository for SqliteRepository {
         }
 
         if subs.len() == 0 {
-            return Ok(None)
+            return Ok(None);
         }
 
         Ok(Some(subs))
     }
 
     async fn get_feed_id(&self, feed_url: &str) -> Result<i64, Error> {
-        let database = Builder::new_local(DATABASE_PATH)
-            .build()
-            .await?;
+        let database = Builder::new_local(DATABASE_PATH).build().await?;
         let connection = database.connect()?;
 
         // Get the identifier of the just inserted URL

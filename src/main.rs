@@ -1,6 +1,5 @@
 pub mod commands;
 pub mod core;
-pub mod test;
 
 use core::publisher::Publisher;
 use core::repository::{Repository, SqliteRepository};
