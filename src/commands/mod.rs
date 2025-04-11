@@ -1,4 +1,6 @@
+pub mod about;
 pub mod list;
+pub mod help;
 pub mod sub;
 pub mod unsub;
 use thiserror::Error;
