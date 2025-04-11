@@ -7,6 +7,7 @@ pub trait Scraper {
     async fn get_rss_feed_content(&self, url: &RssRequest) -> Result<RssResponse, Error>;
     async fn get_profile_pic_url_or_default(&self, profile_url: &str) -> Option<String>;
     async fn get_review_metadata(&self, review_url: &str) -> Option<ReviewMetadata>;
+    async fn does_user_exist(&self, username: &str) -> Result<bool, anyhow::Error>;
 }
 
 pub struct RssResponse {
@@ -106,6 +107,16 @@ impl Scraper for ReqwestScraper {
         }
 
         None
+    }
+
+    async fn does_user_exist(&self, username: &str) -> Result<bool, anyhow::Error> {
+        let response = self.client.head(format!("https://backloggd.com/u/{username}")).send().await?;
+
+        if response.status() == StatusCode::OK {
+            return Ok(true);
+        }
+
+        return Ok(false);
     }
 }
 
