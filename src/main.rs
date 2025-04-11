@@ -3,7 +3,7 @@ pub mod core;
 
 use core::publisher::Publisher;
 use core::repository::{Repository, SqliteRepository};
-use core::scraper::{ReqwestScraper, Scraper};
+use core::scraper::ReqwestScraper;
 use std::sync::Arc;
 
 use crate::core::config;

@@ -9,16 +9,16 @@ use super::models::RssFeed;
 use super::models::Subscription;
 
 pub trait Repository {
-    async fn init_database(&self) -> Result<(), Error>;
-    async fn save_feed(&self, feed_url: &str) -> Result<i64, Error>;
-    async fn get_feed_id(&self, feed_url: &str) -> Result<i64, Error>;
-    async fn update_feed(&self, id: &i64, last_checked: &str, etag: &str) -> Result<(), Error>;
-    async fn delete_feed(&self, id: &i64) -> Result<(), Error>;
-    async fn save_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
-    async fn delete_sub(&self, id: &i64, channel_id: &u64) -> Result<(), Error>;
-    async fn get_channel_feeds(&self, channel_id: &u64) -> Result<Vec<String>, Error>;
-    async fn get_next_unpublished_feed(&self, number: i16) -> Result<Option<Vec<RssFeed>>, Error>;
-    async fn get_subs(&self, feed_id: i64) -> Result<Option<Vec<Subscription>>, Error>;
+    fn init_database(&self) -> impl std::future::Future<Output = Result<(), Error>>;
+    fn save_feed(&self, feed_url: &str) -> impl std::future::Future<Output = Result<i64, Error>>;
+    fn get_feed_id(&self, feed_url: &str) -> impl std::future::Future<Output = Result<i64, Error>>;
+    fn update_feed(&self, id: &i64, last_checked: &str, etag: &str) -> impl std::future::Future<Output = Result<(), Error>>;
+    fn delete_feed(&self, id: &i64) -> impl std::future::Future<Output = Result<(), Error>>;
+    fn save_sub(&self, id: &i64, channel_id: &u64) -> impl std::future::Future<Output = Result<(), Error>>;
+    fn delete_sub(&self, id: &i64, channel_id: &u64) -> impl std::future::Future<Output = Result<(), Error>>;
+    fn get_channel_feeds(&self, channel_id: &u64) -> impl std::future::Future<Output = Result<Vec<String>, Error>>;
+    fn get_next_unpublished_feed(&self, number: i16) -> impl std::future::Future<Output = Result<Option<Vec<RssFeed>>, Error>>;
+    fn get_subs(&self, feed_id: i64) -> impl std::future::Future<Output = Result<Option<Vec<Subscription>>, Error>>;
 }
 
 pub struct SqliteRepository {}

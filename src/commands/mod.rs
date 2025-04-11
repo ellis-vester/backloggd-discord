@@ -10,18 +10,15 @@ pub struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-static FEED_URL_ARG_DESCRIPTION: &str = "feed_url";
-const USERNAME_ARG_DESCRIPTION: &str = "username";
-
 #[derive(Debug)]
-struct SubRequest<'a> {
+pub struct SubRequest<'a> {
     channel_id: &'a u64,
     feed_url: Option<String>,
     username: Option<String>,
 }
 
 #[derive(Debug, Error)]
-enum SubError {
+pub enum SubError {
     #[error("The given RSS feed URL is not valid")]
     InvalidFeedUrl,
     #[error("The given username is not valid")]

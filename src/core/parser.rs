@@ -54,7 +54,7 @@ mod backloggd_date_format {
     use serde::{self, Deserialize, Deserializer, Serializer};
 
     use crate::core::converter;
-    pub fn serialize<S>(date: &NaiveDateTime, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(_date: &NaiveDateTime, _serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {

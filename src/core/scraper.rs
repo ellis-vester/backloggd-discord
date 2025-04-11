@@ -4,10 +4,10 @@ use reqwest::{Client, StatusCode};
 use scraper::Html;
 
 pub trait Scraper {
-    async fn get_rss_feed_content(&self, url: &RssRequest) -> Result<RssResponse, Error>;
-    async fn get_profile_pic_url_or_default(&self, profile_url: &str) -> Option<String>;
-    async fn get_review_metadata(&self, review_url: &str) -> Option<ReviewMetadata>;
-    async fn does_feed_exist(&self, feed_url: &str) -> Result<bool, anyhow::Error>;
+    fn get_rss_feed_content(&self, url: &RssRequest) -> impl std::future::Future<Output = Result<RssResponse, Error>>;
+    fn get_profile_pic_url_or_default(&self, profile_url: &str) -> impl std::future::Future<Output = Option<String>>;
+    fn get_review_metadata(&self, review_url: &str) -> impl std::future::Future<Output = Option<ReviewMetadata>>;
+    fn does_feed_exist(&self, feed_url: &str) -> impl std::future::Future<Output = Result<bool, anyhow::Error>>;
 }
 
 pub struct RssResponse {

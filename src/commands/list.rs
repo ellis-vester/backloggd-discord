@@ -4,12 +4,6 @@ use poise::serenity_prelude::{Color, CreateEmbed};
 use poise::CreateReply;
 use tracing::instrument;
 
-#[derive(Debug)]
-struct ListRequest<'a> {
-    channel_id: &'a u64,
-    feed_url: &'a str,
-}
-
 #[instrument(skip(ctx))]
 #[poise::command(slash_command, prefix_command)]
 pub async fn list(ctx: commands::Context<'_>) -> Result<(), commands::Error> {
